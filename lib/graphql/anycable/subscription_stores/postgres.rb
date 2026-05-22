@@ -182,7 +182,7 @@ module GraphQL
           conn.exec("BEGIN")
           yield
           conn.exec("COMMIT")
-        rescue StandardError
+        rescue
           conn.exec("ROLLBACK")
           raise
         end

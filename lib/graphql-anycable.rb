@@ -14,6 +14,8 @@ require_relative "graphql/subscriptions/anycable_subscriptions"
 module GraphQL
   module AnyCable
     class << self
+      attr_writer :subscription_store
+
       def use(schema, **opts)
         schema.use(GraphQL::Subscriptions::AnyCableSubscriptions, **opts)
       end
@@ -42,10 +44,6 @@ module GraphQL
 
       def subscription_store
         @subscription_store ||= default_subscription_store
-      end
-
-      def subscription_store=(store)
-        @subscription_store = store
       end
 
       def with_subscription_store(&block)
@@ -92,7 +90,9 @@ module GraphQL
       def inferred_subscription_store
         adapter = ::AnyCable.broadcast_adapter
         return :redis if defined?(::AnyCable::BroadcastAdapters::Redis) && adapter.is_a?(::AnyCable::BroadcastAdapters::Redis)
-        return :postgres if adapter.class.name == "AnyCable::BroadcastAdapters::Postgres"
+
+        postgres_adapter = defined?(::AnyCable::BroadcastAdapters::Postgres) && ::AnyCable::BroadcastAdapters::Postgres
+        return :postgres if postgres_adapter && adapter.instance_of?(postgres_adapter)
 
         :redis
       end

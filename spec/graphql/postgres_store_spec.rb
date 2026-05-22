@@ -3,15 +3,13 @@
 require "json"
 
 RSpec.describe GraphQL::AnyCable::SubscriptionStores::Postgres do
-  Event = Struct.new(:topic, :fingerprint)
-
   let(:postgres_url) { ENV["POSTGRES_URL"] || ENV["DATABASE_URL"] }
   let(:pg_conn) { PG.connect(postgres_url) }
   let(:config) { GraphQL::AnyCable.config }
   let(:store) { described_class.new(config: config) }
   let(:subscription_id) { "postgres-store-subscription" }
   let(:channel_id) { "postgres-store-channel" }
-  let(:events) { [Event.new("productUpdated", "fingerprint-1")] }
+  let(:events) { [double(topic: "productUpdated", fingerprint: "fingerprint-1")] }
   let(:data) do
     {
       query_string: "subscription { productUpdated { id } }",
