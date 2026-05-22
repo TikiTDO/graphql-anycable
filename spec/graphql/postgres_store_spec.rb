@@ -20,6 +20,22 @@ RSpec.describe GraphQL::AnyCable::SubscriptionStores::Postgres do
     }
   end
 
+  around do |example|
+    original_subscription_store = config.subscription_store
+    original_postgres_url = config.postgres_url
+    original_subscriptions_table = config.postgres_subscriptions_table
+    original_events_table = config.postgres_subscription_events_table
+    original_channels_table = config.postgres_channel_subscriptions_table
+
+    example.run
+  ensure
+    config.subscription_store = original_subscription_store
+    config.postgres_url = original_postgres_url
+    config.postgres_subscriptions_table = original_subscriptions_table
+    config.postgres_subscription_events_table = original_events_table
+    config.postgres_channel_subscriptions_table = original_channels_table
+  end
+
   before do
     skip "POSTGRES_URL or DATABASE_URL is required" unless postgres_url
 
