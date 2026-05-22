@@ -6,7 +6,7 @@ require "graphql/anycable"
 require "debug" unless ENV["CI"]
 
 require_relative "support/graphql_schema"
-require_relative "redis_helper"
+require_relative "redis_helper" unless ENV["GRAPHQL_ANYCABLE_SKIP_REDIS"]
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
