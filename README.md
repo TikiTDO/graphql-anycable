@@ -187,6 +187,16 @@ GraphQL::AnyCable.configure do |config|
 end
 ```
 
+For PostgreSQL-backed subscription storage, use [`graphql-anycable_postgresql-store`](https://github.com/TikiTDO/graphql-anycable_postgresql-store):
+
+```ruby
+gem "graphql-anycable_postgresql-store"
+
+GraphQL::AnyCable.configure do |config|
+  config.subscription_store = :postgresql
+end
+```
+
 You can also provide a store object directly:
 
 ```ruby
