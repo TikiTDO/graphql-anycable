@@ -17,7 +17,8 @@ See https://github.com/anycable/anycable-rails/issues/40 for more details and di
 
 ## Differences
 
-- Subscription information is stored in a Redis database. By default, we use AnyCable Redis configuration. Expiration or data cleanup should be configured separately (see below).
+- Subscription information is stored in Redis by default, using AnyCable Redis configuration. Expiration or data cleanup should be configured separately (see below).
+- Custom subscription stores can be registered when Redis is not the right persistence backend for your application.
 - GraphQL queries for all subscriptions are re-executed in the process that triggers event (it may be web server, async jobs, rake tasks or whatever)
 
 ## Compatibility
@@ -93,7 +94,7 @@ bundle install
     MySchema.subscriptions.trigger(:product_updated, {}, Product.first!, scope: account.id)
     ```
 
- 4. (Optional) When using other AnyCable broadcasting adapters than Redis, you MUST configure Redis for graphql-anycable yourself:
+ 4. (Optional) When using other AnyCable broadcasting adapters than Redis, you MUST configure Redis for the built-in subscription store yourself:
 
     ```ruby
     GraphQL::AnyCable.redis = Redis.new(url: ENV["REDIS_URL"])
@@ -104,16 +105,7 @@ bundle install
     GraphQL::AnyCable.redis = ->(&block) { redis_pool.with { |conn| block.call(conn) } }
     ```
 
-    Alternatively, when your application uses AnyCable's Postgres broadcast adapter, you can store GraphQL subscription state in Postgres:
-
-    ```ruby
-    GraphQL::AnyCable.configure do |config|
-      config.subscription_store = :postgres
-      config.postgres_url = ENV["DATABASE_URL"]
-    end
-    ```
-
-    With `subscription_store = :postgres`, the host application must create the tables described in [Postgres subscription store](#postgres-subscription-store).
+    If you prefer another persistence backend, register a custom subscription store and select it with `subscription_store`.
 
 ## Broadcasting
 
@@ -156,7 +148,6 @@ GraphQL-AnyCable uses [anyway_config] to configure itself. There are several pos
     GRAPHQL_ANYCABLE_SUBSCRIPTION_STORE=redis
     GRAPHQL_ANYCABLE_USE_REDIS_OBJECT_ON_CLEANUP=true
     GRAPHQL_ANYCABLE_REDIS_PREFIX=graphql
-    GRAPHQL_ANYCABLE_POSTGRES_URL=postgres://localhost:5432/postgres
     ```
 
  2. YAML configuration files (note that this is `config/graphql_anycable.yml`, *not* `config/anycable.yml`):
@@ -165,10 +156,9 @@ GraphQL-AnyCable uses [anyway_config] to configure itself. There are several pos
     # config/graphql_anycable.yml
     production:
       subscription_expiration_seconds: 300 # 5 minutes
-      subscription_store: redis # or postgres
+      subscription_store: redis
       use_redis_object_on_cleanup: false # For restricted redis installations
       redis_prefix: graphql # You can configure redis_prefix for anycable-graphql subscription prefixes. Default value "graphql"
-      postgres_url: postgres://localhost:5432/postgres
     ```
 
  3. Configuration from your application code:
@@ -176,13 +166,45 @@ GraphQL-AnyCable uses [anyway_config] to configure itself. There are several pos
     ```ruby
     GraphQL::AnyCable.configure do |config|
       config.subscription_expiration_seconds = 3600 # 1 hour
-      config.subscription_store = :redis # or :postgres
+      config.subscription_store = :redis
       config.redis_prefix = "graphql" # on our side, we add `-` ourselves after the redis_prefix
-      config.postgres_url = ENV["DATABASE_URL"]
     end
     ```
 
 And any other way provided by [anyway_config]. Check its documentation!
+
+## Custom subscription stores
+
+The built-in subscription store is `:redis`. External gems and applications can register additional stores:
+
+```ruby
+GraphQL::AnyCable.register_subscription_store(:my_store) do |config|
+  MySubscriptionStore.new(config: config)
+end
+
+GraphQL::AnyCable.configure do |config|
+  config.subscription_store = :my_store
+end
+```
+
+You can also provide a store object directly:
+
+```ruby
+GraphQL::AnyCable.subscription_store = MySubscriptionStore.new
+```
+
+A subscription store must implement the following methods:
+
+- `stream_for(fingerprint)`
+- `fingerprints_for_topic(topic)`
+- `subscription_ids_for_fingerprints(fingerprints)`
+- `subscription_exists?(subscription_id)`
+- `write_subscription(subscription_id, channel_id:, data:, events:, expiration_seconds:)`
+- `read_subscription(subscription_id)`
+- `delete_channel_subscriptions(channel_id)`
+- `delete_subscription(subscription_id)`
+
+The `data` hash passed to `write_subscription` contains `:query_string`, `:variables`, `:context`, `:operation_name`, and `:events`.
 
 ## Emergency actions
 
@@ -227,9 +249,9 @@ GraphQL::AnyCable.with_redis do |redis|
 end
 ```
 
-## Data model
+## Redis data model
 
-As in AnyCable there is no place to store subscription data in-memory, it should be persisted somewhere to be retrieved on `GraphQLSchema.subscriptions.trigger` and sent to subscribed clients. `graphql-anycable` uses the same Redis database as AnyCable itself.
+As in AnyCable there is no place to store subscription data in-memory, it should be persisted somewhere to be retrieved on `GraphQLSchema.subscriptions.trigger` and sent to subscribed clients. The built-in Redis store uses the same Redis database as AnyCable itself.
 
  1. Grouped event subscriptions: `graphql-fingerprints:#{event.topic}` sorted set. Used to find all subscriptions on `GraphQLSchema.subscriptions.trigger`.
 
@@ -263,46 +285,6 @@ As in AnyCable there is no place to store subscription data in-memory, it should
     SMEMBERS graphql-channel:17420c6ed9e
     => 52ee8d65-275e-4d22-94af-313129116388
     ```
-
-### Postgres subscription store
-
-Set `subscription_store` to `postgres` to store GraphQL subscription state in Postgres instead of Redis. The Postgres store does not deliver AnyCable broadcasts itself; it only keeps the GraphQL subscription registry. Delivery still goes through the configured AnyCable broadcast adapter.
-
-The store expects the host application to create these tables:
-
-```sql
-CREATE TABLE graphql_anycable_subscriptions (
-  id text PRIMARY KEY,
-  query_string text NOT NULL,
-  variables text NOT NULL,
-  context text NOT NULL,
-  operation_name text NOT NULL,
-  events jsonb NOT NULL DEFAULT '{}',
-  expires_at timestamp,
-  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE graphql_anycable_subscription_events (
-  subscription_id text NOT NULL REFERENCES graphql_anycable_subscriptions(id) ON DELETE CASCADE,
-  topic text NOT NULL,
-  fingerprint text NOT NULL,
-  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (subscription_id, topic, fingerprint)
-);
-
-CREATE INDEX index_graphql_anycable_subscription_events_topic_fingerprint
-  ON graphql_anycable_subscription_events (topic, fingerprint);
-
-CREATE TABLE graphql_anycable_channel_subscriptions (
-  channel_id text NOT NULL,
-  subscription_id text NOT NULL REFERENCES graphql_anycable_subscriptions(id) ON DELETE CASCADE,
-  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (channel_id, subscription_id)
-);
-```
-
-The table names can be customized with `postgres_subscriptions_table`, `postgres_subscription_events_table`, and `postgres_channel_subscriptions_table`.
 
 ## Stats
 

@@ -6,10 +6,7 @@ require "graphql/anycable"
 require "debug" unless ENV["CI"]
 
 require_relative "support/graphql_schema"
-
-subscription_store = GraphQL::AnyCable.config.subscription_store.to_s
-broadcast_adapter = AnyCable.config.broadcast_adapter.to_s
-require_relative "redis_helper" unless subscription_store == "postgres" || broadcast_adapter == "postgres"
+require_relative "redis_helper"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
