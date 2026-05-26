@@ -78,7 +78,7 @@ module GraphQL
       end
 
       def adapter
-        GraphQL::Subscriptions::AnyCableSubscriptions
+        GraphQL::AnyCable::SubscriptionStores::Redis
       end
 
       def config
