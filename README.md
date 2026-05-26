@@ -94,7 +94,9 @@ bundle install
     MySchema.subscriptions.trigger(:product_updated, {}, Product.first!, scope: account.id)
     ```
 
- 4. (Optional) When using other AnyCable broadcasting adapters than Redis, you MUST configure Redis for the built-in subscription store yourself:
+ 4. (Optional) If you keep the built-in Redis subscription store while using a
+    non-Redis AnyCable broadcasting adapter, configure Redis for graphql-anycable
+    explicitly:
 
     ```ruby
     GraphQL::AnyCable.redis = Redis.new(url: ENV["REDIS_URL"])
@@ -105,7 +107,9 @@ bundle install
     GraphQL::AnyCable.redis = ->(&block) { redis_pool.with { |conn| block.call(conn) } }
     ```
 
-    If you prefer another persistence backend, register a custom subscription store and select it with `subscription_store`.
+    If you prefer another persistence backend, register a custom subscription
+    store and select it with `subscription_store`; in that case, Redis is not
+    required for graphql-anycable subscription state.
 
 ## Broadcasting
 
