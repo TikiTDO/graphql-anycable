@@ -221,6 +221,12 @@ A subscription store must implement the following methods:
 
 The `data` hash passed to `write_subscription` contains `:query_string`, `:variables`, `:context`, `:operation_name`, and `:events`.
 
+`stats` must return a hash with a `:total` entry containing integer counters
+for `:subscription`, `:fingerprints`, `:subscriptions`, and `:channel`.
+When `include_subscriptions` is true, it should also include a
+`:subscriptions` hash mapping subscription names/topics to active subscriber
+counts. Stores that do not scan keys may accept and ignore `scan_count`.
+
 ## Emergency actions
 
 In situations when you don't set `subscription_expiration_seconds`, have a lot of inactive subscriptions, and `GraphQL::AnyCable::Cleaner` does`t help in that,
