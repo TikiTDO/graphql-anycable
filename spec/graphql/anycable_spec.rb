@@ -247,7 +247,7 @@ RSpec.describe GraphQL::AnyCable do
 
       described_class.subscription_store = store
 
-      expect(described_class.with_subscription_store { |subscription_store| subscription_store }).to be(store)
+      expect(described_class.subscription_store).to be(store)
     end
 
     it "builds a registered custom store from config" do

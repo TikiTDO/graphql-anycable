@@ -52,7 +52,7 @@ module GraphQL
     class AnyCableSubscriptions < GraphQL::Subscriptions
       extend Forwardable
 
-      def_delegators :"GraphQL::AnyCable", :with_subscription_store, :config
+      def_delegators :"GraphQL::AnyCable", :subscription_store, :config
       def_delegators :"::AnyCable", :broadcast
 
       # @param serializer [<#dump(obj), #load(string)] Used for serializing messages before handing them to `.broadcast(msg)`
@@ -64,10 +64,10 @@ module GraphQL
       # An event was triggered.
       # Re-evaluate all subscribed queries and push the data over ActionCable.
       def execute_all(event, object)
-        fingerprints = with_subscription_store { |store| store.fingerprints_for_topic(event.topic) }
+        fingerprints = subscription_store.fingerprints_for_topic(event.topic)
         return if fingerprints.empty?
 
-        fingerprint_subscription_ids = with_subscription_store { |store| store.subscription_ids_for_fingerprints(fingerprints) }
+        fingerprint_subscription_ids = subscription_store.subscription_ids_for_fingerprints(fingerprints)
 
         fingerprint_subscription_ids.each do |fingerprint, subscription_ids|
           execute_grouped(fingerprint, subscription_ids, event, object)
@@ -82,9 +82,7 @@ module GraphQL
       def execute_grouped(fingerprint, subscription_ids, event, object)
         return if subscription_ids.empty?
 
-        subscription_id = with_subscription_store do |store|
-          subscription_ids.find { |sid| store.subscription_exists?(sid) }
-        end
+        subscription_id = subscription_ids.find { |sid| subscription_store.subscription_exists?(sid) }
         return unless subscription_id # All subscriptions has expired but haven't cleaned up yet
 
         result = execute_update(subscription_id, event, object)
@@ -131,20 +129,18 @@ module GraphQL
           events: events.map { |e| [e.topic, e.fingerprint] }.to_h.to_json
         }
 
-        with_subscription_store do |store|
-          store.write_subscription(
-            subscription_id,
-            channel_id: subscription_id,
-            data: data,
-            events: events,
-            expiration_seconds: config.subscription_expiration_seconds
-          )
-        end
+        subscription_store.write_subscription(
+          subscription_id,
+          channel_id: subscription_id,
+          data: data,
+          events: events,
+          expiration_seconds: config.subscription_expiration_seconds
+        )
       end
 
       # Return the query from storage.
       def read_subscription(subscription_id)
-        subscription = with_subscription_store { |store| store.read_subscription(subscription_id) }
+        subscription = subscription_store.read_subscription(subscription_id)
         return unless subscription
 
         subscription[:context] = @serializer.load(subscription[:context])
@@ -162,7 +158,7 @@ module GraphQL
         # Missing in case disconnect happens before #execute
         return unless channel_id
 
-        with_subscription_store { |store| store.delete_channel_subscriptions(channel_id) }
+        subscription_store.delete_channel_subscriptions(channel_id)
       end
 
       def delete_subscription(subscription_id, redis: nil)
@@ -170,7 +166,7 @@ module GraphQL
           store = GraphQL::AnyCable::SubscriptionStores::Redis.new(redis_connector: ->(&block) { block.call(redis) }, config: config)
           store.delete_subscription(subscription_id, redis: redis)
         else
-          with_subscription_store { |store| store.delete_subscription(subscription_id) }
+          subscription_store.delete_subscription(subscription_id)
         end
       end
 
@@ -205,7 +201,7 @@ module GraphQL
       end
 
       def subscription_stream(fingerprint)
-        with_subscription_store { |store| store.stream_for(fingerprint) }
+        subscription_store.stream_for(fingerprint)
       end
     end
   end

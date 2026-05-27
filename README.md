@@ -217,6 +217,7 @@ A subscription store must implement the following methods:
 - `read_subscription(subscription_id)`
 - `delete_channel_subscriptions(channel_id)`
 - `delete_subscription(subscription_id)`
+- `stats(scan_count:, include_subscriptions:)`
 
 The `data` hash passed to `write_subscription` contains `:query_string`, `:variables`, `:context`, `:operation_name`, and `:events`.
 
@@ -302,13 +303,13 @@ As in AnyCable there is no place to store subscription data in-memory, it should
 
 ## Stats
 
-You can grab Redis subscription statistics by calling:
+You can grab subscription store statistics by calling:
 
 ```ruby
 GraphQL::AnyCable.stats
 ```
 
-It will return a total of the amount of the key with the following prefixes:
+For the built-in Redis store, it returns the total amount of keys with the following prefixes:
 
 ```txt
 graphql-subscription
@@ -353,7 +354,7 @@ It will return the response that contains `subscriptions`:
   }
 ```
 
-Also, you can set another `scan_count`, if needed. The default value is 1_000:
+Also, you can set another `scan_count`, if needed. The default value is 1_000. Stores that do not scan keys can ignore this option:
 
 ```ruby
 GraphQL::AnyCable.stats(scan_count: 100)
@@ -391,8 +392,8 @@ Yabeda.configure do
   collect do
     statistics = GraphQL::AnyCable.stats[:total]
 
-    statistics.each do |redis_prefix, value|
-      graphql_anycable_statistics.subscriptions_count.set({name: redis_prefix}, value)
+    statistics.each do |stat_name, value|
+      graphql_anycable_statistics.subscriptions_count.set({name: stat_name}, value)
     end
   end
 end

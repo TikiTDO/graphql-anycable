@@ -13,6 +13,8 @@ require_relative "graphql/subscriptions/anycable_subscriptions"
 module GraphQL
   module AnyCable
     class << self
+      attr_writer :subscription_store
+
       def use(schema, **opts)
         schema.use(GraphQL::Subscriptions::AnyCableSubscriptions, **opts)
       end
@@ -47,16 +49,8 @@ module GraphQL
         subscription_store_registry[name.to_sym] = factory || -> { store }
       end
 
-      def subscription_store=(store)
-        @subscription_store = store
-      end
-
       def subscription_store
         @subscription_store ||= default_subscription_store
-      end
-
-      def with_subscription_store(&block)
-        block.call(subscription_store)
       end
 
       def config

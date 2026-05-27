@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- Add a custom subscription store interface. [@TikiTDO] ([#54](https://github.com/anycable/graphql-anycable/pull/54))
+- Add a custom subscription store interface, including store-backed stats. [@TikiTDO] ([#54](https://github.com/anycable/graphql-anycable/pull/54))
 
 ## 1.3.1 - 2025-03-29
 
