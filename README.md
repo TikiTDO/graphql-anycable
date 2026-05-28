@@ -218,6 +218,7 @@ A subscription store must implement the following methods:
 - `delete_channel_subscriptions(channel_id)`
 - `delete_subscription(subscription_id)`
 - `stats(scan_count:, include_subscriptions:)`
+- `cleaner`
 
 The `data` hash passed to `write_subscription` contains `:query_string`, `:variables`, `:context`, `:operation_name`, and `:events`.
 
@@ -226,6 +227,11 @@ for `:subscription`, `:fingerprints`, `:subscriptions`, and `:channel`.
 When `include_subscriptions` is true, it should also include a
 `:subscriptions` hash mapping subscription names/topics to active subscriber
 counts. Stores that do not scan keys may accept and ignore `scan_count`.
+
+`cleaner` must return an object that responds to `clean`,
+`clean_channels`, `clean_subscriptions`, `clean_fingerprint_subscriptions`,
+and `clean_topic_fingerprints`. Stores that do not need cleanup may return a
+no-op cleaner.
 
 ## Emergency actions
 

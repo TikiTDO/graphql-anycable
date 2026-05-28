@@ -272,6 +272,14 @@ RSpec.describe GraphQL::AnyCable do
         /Register it with GraphQL::AnyCable\.register_subscription_store\(:unknown\)/
       )
     end
+
+    it "builds the default Redis store with stats and cleaner objects" do
+      store = described_class.subscription_store
+
+      expect(store).to be_a(GraphQL::AnyCable::SubscriptionStores::Redis)
+      expect(store.cleaner).to be_a(GraphQL::AnyCable::SubscriptionStores::Redis::Cleaner)
+      expect(store.stats(scan_count: 25)).to include(total: a_hash_including(:subscription, :fingerprints, :subscriptions, :channel))
+    end
   end
 
   describe ".stats" do
