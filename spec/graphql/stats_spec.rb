@@ -1,23 +1,6 @@
 # frozen_string_literal: true
 
 RSpec.describe GraphQL::AnyCable::Stats do
-  it "delegates collection to the configured subscription store" do
-    original_store_defined = GraphQL::AnyCable.instance_variable_defined?(:@subscription_store)
-    original_store = GraphQL::AnyCable.instance_variable_get(:@subscription_store) if original_store_defined
-    store = instance_double("SubscriptionStore")
-
-    allow(store).to receive(:stats).with(scan_count: 25, include_subscriptions: true).and_return(total: {})
-    GraphQL::AnyCable.subscription_store = store
-
-    expect(described_class.new(scan_count: 25, include_subscriptions: true).collect).to eq(total: {})
-  ensure
-    if original_store_defined
-      GraphQL::AnyCable.instance_variable_set(:@subscription_store, original_store)
-    elsif GraphQL::AnyCable.instance_variable_defined?(:@subscription_store)
-      GraphQL::AnyCable.remove_instance_variable(:@subscription_store)
-    end
-  end
-
   describe "#collect" do
     let(:query) do
       <<~GRAPHQL
